@@ -1,0 +1,38 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables (credentials)
+.env
+.env_*
+*.env
+
+# SSH keys and sensitive files
+*.pem
+*.key
+
+# Database dumps
+*.sql
+*.dump
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+
+# Log files
+*.log
+
+# Backup / temp files
+*~
+*.bak
+*.tmp
