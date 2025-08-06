@@ -9,8 +9,14 @@ from pydrive2.drive import GoogleDrive
 
 load_dotenv()
 
-# Path to your venv Python
-VENV_PYTHON = r"C:\Prushal\dump_download_scrape\.venv\Scripts\python.exe"
+import os
+import sys
+
+# Dynamically get current venv python executable
+VENV_PYTHON = sys.executable
+
+# # Path to your venv Python
+# VENV_PYTHON = r"C:\Prushal\dump_download_scrape\.venv\Scripts\python.exe"
 
 
 # Folders where dumps are stored
