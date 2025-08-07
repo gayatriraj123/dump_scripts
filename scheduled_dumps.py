@@ -6,11 +6,22 @@ import os
 from dotenv import load_dotenv
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
+import logging
+import sys
+
+# ==================== Logging Setup ====================
+os.makedirs("logs", exist_ok=True)  # Create logs dir if it doesn't exist
+
+logging.basicConfig(
+    filename="logs/dump_scheduler.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logging.info("=== Script started ===")
+# =======================================================
 
 load_dotenv()
-
-import os
-import sys
 
 # Dynamically get current venv python executable
 VENV_PYTHON = sys.executable
@@ -48,21 +59,24 @@ DRIVE_FOLDERS = {
 
 # Keep dumps for last 10 days
 KEEP_LAST = 10
-RETENTION_DAYS = 10 
+# RETENTION_DAYS = 10 
 
 # ===== Authenticate Google Drive =====
 gauth = GoogleAuth()
 gauth.LoadCredentialsFile("token.json")
 
-if not gauth.credentials:
-    gauth.LocalWebserverAuth()
-    gauth.SaveCredentialsFile("token.json")  # ✅ Save token after first login
-else:
-    if gauth.access_token_expired:
+try:
+    if not gauth.credentials:
+        gauth.LocalWebserverAuth()
+        gauth.SaveCredentialsFile("token.json")
+    elif gauth.access_token_expired:
         gauth.Refresh()
-        gauth.SaveCredentialsFile("token.json")  # ✅ Save refreshed token
+        gauth.SaveCredentialsFile("token.json")
     else:
         gauth.Authorize()
+except Exception as e:
+    logging.error("Google Drive authentication failed", exc_info=True)
+    sys.exit(1)
 drive = GoogleDrive(gauth)
 
 
@@ -77,55 +91,64 @@ def cleanup_old_local_dumps(folder):
     
     # Delete all files except the most recent `keep_last`
     for old_file in files[KEEP_LAST:]:
-        print(f"[INFO] Deleting old dump: {old_file}")
+        logging.info(f"Deleting old local dump: {old_file}")
         os.remove(old_file)
 
 def upload_to_drive(local_file, folder_id):
-    """Upload file to Google Drive."""
     file_name = os.path.basename(local_file)
-    gfile = drive.CreateFile({"parents": [{"id": folder_id}], "title": file_name})
-    gfile.SetContentFile(local_file)
-    gfile.Upload()
-    print(f"[INFO] Uploaded to Google Drive folder {folder_id}: {file_name}")
+    try:
+        gfile = drive.CreateFile({"parents": [{"id": folder_id}], "title": file_name})
+        gfile.SetContentFile(local_file)
+        gfile.Upload()
+        logging.info(f"Uploaded to Google Drive folder {folder_id}: {file_name}")
+    except Exception as e:
+        logging.error(f"Failed to upload {file_name} to folder {folder_id}", exc_info=True)
+
 
 
 def cleanup_old_drive_files(folder_id, keep_last=10):
-    """Keep only the latest keep_last files in Google Drive folder."""
-    file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
-    # Sort by modifiedDate (newest first)
-    file_list.sort(key=lambda x: x['modifiedDate'], reverse=True)
+    try:
+        file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
+        file_list.sort(key=lambda x: x['modifiedDate'], reverse=True)
 
-    for old_file in file_list[keep_last:]:
-        print(f"[INFO] Deleting old Google Drive file: {old_file['title']}")
-        old_file.Delete()
+        for old_file in file_list[keep_last:]:
+            logging.info(f"Deleting old Google Drive file: {old_file['title']}")
+            old_file.Delete()
+    except Exception as e:
+        logging.error(f"Drive cleanup failed for folder {folder_id}", exc_info=True)
+
 
 def process_dump(db_key, script_name):
-    """Run dump, upload to multiple folders, cleanup."""
     cleanup_old_local_dumps(DUMP_FOLDERS[db_key])
+    logging.info(f"=== Running {db_key.upper()} dump ===")
 
-    print(f"=== Running {db_key.upper()} dump ===")
-    subprocess.run([VENV_PYTHON, script_name])
+    try:
+        subprocess.run([VENV_PYTHON, script_name], check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Script failed: {script_name}", exc_info=True)
+        return
 
-    # Find latest local dump
-    latest_dump = max(
-        [os.path.join(DUMP_FOLDERS[db_key], f) for f in os.listdir(DUMP_FOLDERS[db_key]) if f.endswith(".sql")],
-        key=os.path.getmtime
-    )
+    try:
+        latest_dump = max(
+            [os.path.join(DUMP_FOLDERS[db_key], f) for f in os.listdir(DUMP_FOLDERS[db_key]) if f.endswith(".sql")],
+            key=os.path.getmtime
+        )
+    except Exception as e:
+        logging.error(f"Could not find latest dump for {db_key}", exc_info=True)
+        return
 
-    # Upload to all configured Google Drive folders
     for folder_id in DRIVE_FOLDERS[db_key]:
         if folder_id:
             upload_to_drive(latest_dump, folder_id)
             cleanup_old_drive_files(folder_id, KEEP_LAST)
 
-def run_all_dumps():
-    print(f"\n[{datetime.now()}] === Starting scheduled database dumps ===")
 
+def run_all_dumps():
+    logging.info("=== Starting scheduled database dumps ===")
     process_dump("bopo", "download_bopo_dump.py")
     process_dump("ext_test", "download_EXT_dump.py")
     process_dump("ext_prod", "download_ext_production_dump.py")
-
-    print(f"[{datetime.now()}] === All dumps completed ===\n")
+    logging.info("=== All dumps completed ===\n")
 
 
 # (24-hour format)
@@ -133,7 +156,7 @@ def run_all_dumps():
 schedule.every(0.5).minutes.do(run_all_dumps)  # run every 1 minute for testing
 
 
-print("[INFO] Scheduler started. Waiting for scheduled time...")
+logging.info("Scheduler started. Waiting for scheduled time...")
 
 while True:
     schedule.run_pending()
