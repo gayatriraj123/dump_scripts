@@ -8,6 +8,7 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 import logging
 import sys
+import shutil
 
 # ==================== Logging Setup ====================
 os.makedirs("logs", exist_ok=True)  # Create logs dir if it doesn't exist
@@ -25,6 +26,9 @@ load_dotenv()
 
 # Dynamically get current venv python executable
 VENV_PYTHON = sys.executable
+
+CURRENT_DIR = os.getcwd()
+DB_BACKUP_REPO = os.path.join("C:\\Prushal", "db_backups")
 
 # # Path to your venv Python
 # VENV_PYTHON = r"C:\Prushal\dump_download_scrape\.venv\Scripts\python.exe"
@@ -77,6 +81,7 @@ try:
 except Exception as e:
     logging.error("Google Drive authentication failed", exc_info=True)
     sys.exit(1)
+
 drive = GoogleDrive(gauth)
 
 
@@ -117,8 +122,56 @@ def cleanup_old_drive_files(folder_id, keep_last=10):
     except Exception as e:
         logging.error(f"Drive cleanup failed for folder {folder_id}", exc_info=True)
 
+def cleanup_old_repo_dumps(folder, keep_last=10):
+    """
+    Deletes older .sql files in a GitHub repo folder, keeping only the latest `keep_last`.
+    """
+    if not os.path.exists(folder):
+        return
+
+    # Get .sql files sorted by modification time (newest first)
+    files = sorted(
+        [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".sql")],
+        key=os.path.getmtime,
+        reverse=True
+    )
+
+    for old_file in files[keep_last:]:
+        logging.info(f"[GitHub Cleanup] Deleting old file: {old_file}")
+        os.remove(old_file)
+
+
+def copy_dump_to_repo(dump_path, db_key):
+    dest_folder = os.path.join(DB_BACKUP_REPO, DUMP_FOLDERS[db_key])
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
+
+    # Clean up old files from GitHub repo folder before copying new
+    cleanup_old_repo_dumps(dest_folder, keep_last=KEEP_LAST)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    new_filename = f"{timestamp}_{os.path.basename(dump_path)}"
+    dest_path = os.path.join(dest_folder, new_filename)
+
+    try:
+        shutil.copy2(dump_path, dest_path)
+        logging.info(f"[GitHub Copy] Copied dump to backup repo: {dest_path}")
+    except Exception as e:
+        logging.error(f"[GitHub Copy Error] Failed to copy dump for {db_key}", exc_info=True)
+
+
+def push_to_backup_repo():
+    try:
+        subprocess.run(["git", "add", "."], cwd=DB_BACKUP_REPO, check=True)
+        subprocess.run(["git", "commit", "-m", f"Auto backup at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"], cwd=DB_BACKUP_REPO, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=DB_BACKUP_REPO, check=True)
+        logging.info("Pushed SQL dumps to GitHub db_backups repo.")
+    except subprocess.CalledProcessError:
+        logging.error("Git push to db_backups repo failed.", exc_info=True)
+
 
 def process_dump(db_key, script_name):
+    dump_folder = DUMP_FOLDERS[db_key]
     cleanup_old_local_dumps(DUMP_FOLDERS[db_key])
     logging.info(f"=== Running {db_key.upper()} dump ===")
 
@@ -133,7 +186,7 @@ def process_dump(db_key, script_name):
             [os.path.join(DUMP_FOLDERS[db_key], f) for f in os.listdir(DUMP_FOLDERS[db_key]) if f.endswith(".sql")],
             key=os.path.getmtime
         )
-    except Exception as e:
+    except Exception:
         logging.error(f"Could not find latest dump for {db_key}", exc_info=True)
         return
 
@@ -142,12 +195,17 @@ def process_dump(db_key, script_name):
             upload_to_drive(latest_dump, folder_id)
             cleanup_old_drive_files(folder_id, KEEP_LAST)
 
+    # Copy to GitHub backup repo
+    copy_dump_to_repo(latest_dump, db_key)
+
+
 
 def run_all_dumps():
     logging.info("=== Starting scheduled database dumps ===")
     process_dump("bopo", "download_bopo_dump.py")
     process_dump("ext_test", "download_EXT_dump.py")
     process_dump("ext_prod", "download_ext_production_dump.py")
+    push_to_backup_repo()
     logging.info("=== All dumps completed ===\n")
 
 
