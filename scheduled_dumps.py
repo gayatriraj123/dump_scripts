@@ -38,7 +38,8 @@ DB_BACKUP_REPO = os.path.join("C:\\Prushal", "db_backups")
 DUMP_FOLDERS = {
     "bopo": "BOPO_test",
     "ext_test": "EXT_test",
-    "ext_prod": "EXT_production"
+    "ext_prod": "EXT_production",
+    "kavya": "KAVYA_test"
 }
 
 # ===== Google Drive folder IDs =====
@@ -57,7 +58,12 @@ DRIVE_FOLDERS = {
         os.getenv("DRIVE_EXT_PROD_FOLDER_ID"),
         os.getenv("DRIVE_EXT_PROD_BACKUP_FOLDER_ID_1"),
         os.getenv("DRIVE_EXT_PROD_BACKUP_FOLDER_ID_2")
-    ]
+    ],
+    "kavya": [
+        os.getenv("DRIVE_KAVYA_FOLDER_ID"),
+        os.getenv("DRIVE_KAVYA_BACKUP_FOLDER_ID_1"),
+        os.getenv("DRIVE_KAVYA_BACKUP_FOLDER_ID_2")
+    ] 
 }
 
 
@@ -205,13 +211,14 @@ def run_all_dumps():
     process_dump("bopo", "download_bopo_dump.py")
     process_dump("ext_test", "download_EXT_dump.py")
     process_dump("ext_prod", "download_ext_production_dump.py")
+    process_dump("kavya", "download_kavya_dump.py")
     push_to_backup_repo()
     logging.info("=== All dumps completed ===\n")
-
+    
 
 # (24-hour format)
-# schedule.every().day.at("02:00").do(run_all_dumps)  # every day at 2 AM
-schedule.every(0.5).minutes.do(run_all_dumps)  # run every 1 minute for testing
+schedule.every().day.at("02:00").do(run_all_dumps)  # every day at 2 AM
+# schedule.every(0.5).minutes.do(run_all_dumps)  # run every 1 minute for testing
 
 
 logging.info("Scheduler started. Waiting for scheduled time...")
