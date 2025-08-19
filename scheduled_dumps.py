@@ -227,4 +227,12 @@ logging.info("Scheduler started. Waiting for scheduled time...")
 #     schedule.run_pending()
 #     time.sleep(10)  # check every 30 seconds
 if __name__ == "__main__":
-    run_all_dumps()
+    try:
+        run_all_dumps()
+    except Exception as e:
+        import traceback
+        print("ERROR during dump execution:")
+        traceback.print_exc()
+        import sys
+        sys.exit(1)
+
