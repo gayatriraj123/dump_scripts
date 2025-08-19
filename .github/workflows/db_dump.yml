@@ -30,7 +30,9 @@ jobs:
         chmod 600 ssh_keys/EXG-Linux-key-pair.pem
         echo "${{ secrets.KAVYA_DJANGO_KEY }}" > ssh_keys/Kavya_django_key.pem
         chmod 600 ssh_keys/Kavya_django_key.pem
-        
+
+    - name: Restore token.json
+      run: echo '${{ secrets.TOKEN_JSON }}' > token.json
      # Then run the dump script
     - name: Run dump script
       run: python scheduled_dumps.py
