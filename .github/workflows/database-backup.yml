@@ -100,6 +100,10 @@ jobs:
 
     - name: Run database backup script
       run: |
+        # List files to debug directory structure
+        ls -la
+        echo "Current directory: $(pwd)"
+        # Run the script
         python scheduled_dump.py
 
     - name: Clean up sensitive files
