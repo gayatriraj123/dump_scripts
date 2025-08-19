@@ -27,8 +27,7 @@ load_dotenv()
 # Dynamically get current venv python executable
 VENV_PYTHON = sys.executable
 
-CURRENT_DIR = os.getcwd()
-DB_BACKUP_REPO = os.path.join("C:\\Prushal", "db_backups")
+DB_BACKUP_REPO = os.path.join(os.getcwd(), "db_backups")
 
 # # Path to your venv Python
 # VENV_PYTHON = r"C:\Prushal\dump_download_scrape\.venv\Scripts\python.exe"
