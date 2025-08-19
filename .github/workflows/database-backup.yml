@@ -104,7 +104,7 @@ jobs:
         ls -la
         echo "Current directory: $(pwd)"
         # Run the script
-        python scheduled_dump.py
+        python scheduled_dumps.py
 
     - name: Clean up sensitive files
       run: |
