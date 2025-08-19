@@ -13,12 +13,14 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+
     - name: Install dependencies
       run: pip install -r requirements.txt
       
     - name: Setup .env file
       run: |
         echo "${{ secrets.ENV_FILE }}" > .env
+
     - name: Add SSH keys
       run: |
         mkdir -p ssh_keys
@@ -26,6 +28,7 @@ jobs:
         chmod 600 ssh_keys/EXG_LINUX_KEY_PAIR.pem
         echo "${{ secrets.KAVYA_DJANGO_KEY }}" > ssh_keys/Kavya_django_key.pem
         chmod 600 ssh_keys/Kavya_django_key.pem
+
     - name: Restore token.json
       run: echo '${{ secrets.TOKEN }}' > token.json
       
@@ -33,4 +36,3 @@ jobs:
       run: |
         set -x
         python scheduled_dumps.py
-
