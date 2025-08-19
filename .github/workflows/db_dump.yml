@@ -18,6 +18,19 @@ jobs:
 
     - name: Install dependencies
       run: pip install -r requirements.txt
+      
+    - name: Setup .env file
+      run: |
+        echo "${{ secrets.ENV_FILE }}" > .env
 
+    - name: Add SSH keys
+      run: |
+        mkdir -p ssh_keys
+        echo "${{ secrets.EXG_LINUX_KEY_PAIR }}" > ssh_keys/EXG-Linux-key-pair.pem
+        chmod 600 ssh_keys/EXG-Linux-key-pair.pem
+        echo "${{ secrets.KAVYA_DJANGO_KEY }}" > ssh_keys/Kavya_django_key.pem
+        chmod 600 ssh_keys/Kavya_django_key.pem
+        
+     # Then run the dump script
     - name: Run dump script
       run: python scheduled_dumps.py
