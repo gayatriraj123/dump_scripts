@@ -217,12 +217,14 @@ def run_all_dumps():
     
 
 # (24-hour format)
-schedule.every().day.at("02:00").do(run_all_dumps)  # every day at 2 AM
+# schedule.every().day.at("02:00").do(run_all_dumps)  # every day at 2 AM
 # schedule.every(0.5).minutes.do(run_all_dumps)  # run every 1 minute for testing
 
 
 logging.info("Scheduler started. Waiting for scheduled time...")
 
-while True:
-    schedule.run_pending()
-    time.sleep(10)  # check every 30 seconds
+# while True:
+#     schedule.run_pending()
+#     time.sleep(10)  # check every 30 seconds
+if __name__ == "__main__":
+    run_all_dumps()
