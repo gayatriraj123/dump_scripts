@@ -1,37 +1,67 @@
-name: Scheduled Database Dump
+name: Scheduled DB Dumps
+
 on:
   schedule:
-    - cron: '0 2 * * *'      # every day at 2 AM UTC
-  workflow_dispatch:
-jobs:
-  run_dump:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+    - cron: "0 */6 * * *"   # every 6 hours (adjust as needed)
+  workflow_dispatch:         # allow manual trigger
 
-    - name: Install dependencies
-      run: pip install -r requirements.txt
-      
-    - name: Setup .env file
-      run: echo "${{ secrets.ENV_FILE }}" > .env
-    
-    - name: Add SSH keys
-      run: |
-        mkdir -p ssh_keys
-        echo "${{ secrets.EXG_LINUX_KEY_PAIR }}" > ssh_keys/EXG_LINUX_KEY_PAIR.pem
-        chmod 600 ssh_keys/EXG_LINUX_KEY_PAIR.pem
-        echo "${{ secrets.KAVYA_DJANGO_KEY }}" > ssh_keys/Kavya_django_key.pem
-        chmod 600 ssh_keys/Kavya_django_key.pem
-    
-    - name: Restore token.json
-      run: echo '${{ secrets.TOKEN }}' > token.json
-    
-    - name: Run Dump Script with Debug
-      run: |
-        set -x
-        python scheduled_dumps.py
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dump_scripts repo
+        uses: actions/checkout@v3
+        with:
+          repository: gayatriraj123/dump_scripts
+          path: dump_scripts
+
+      - name: Checkout db_backups repo
+        uses: actions/checkout@v3
+        with:
+          repository: gayatriraj123/db_backups
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: db_backups
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          cd dump_scripts
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Setup .env file from secret
+        run: |
+          echo "${{ secrets.ENV_FILE }}" | base64 --decode > dump_scripts/.env
+
+      - name: Run scheduled dump script
+        run: |
+          cd dump_scripts
+          python scheduled_dumps.py
+
+      - name: Copy new dumps into db_backups repo
+        run: |
+          cp -r dump_scripts/BOPO_test/*.sql db_backups/BOPO_test/ || true
+          cp -r dump_scripts/EXT_test/*.sql db_backups/EXT_test/ || true
+          cp -r dump_scripts/EXT_production/*.sql db_backups/EXT_production/ || true
+
+      - name: Keep only 10 most recent files per folder
+        run: |
+          for folder in BOPO_test EXT_test EXT_production; do
+            cd db_backups/$folder
+            ls -tp | grep -v '/$' | tail -n +11 | xargs -I {} rm -- {}
+            cd ../..
+          done
+
+      - name: Commit and push backups
+        run: |
+          cd db_backups
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "Update DB backups on $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git push origin main
