@@ -11,6 +11,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -33,6 +34,6 @@ jobs:
 
     - name: Restore token.json
       run: echo '${{ secrets.TOKEN_JSON }}' > token.json
-     # Then run the dump script
+      
     - name: Run dump script
       run: python scheduled_dumps.py
