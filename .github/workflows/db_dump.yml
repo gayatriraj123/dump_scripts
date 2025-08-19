@@ -1,102 +1,110 @@
-name: Database Backup
+name: Database Backup Scheduler
 
 on:
-  workflow_dispatch:  # manual trigger
   schedule:
-    - cron: "30 20 * * *"   # runs daily at 2:00 AM IST (20:30 UTC)
+    # Run every day at 2 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  backup:
+  database-backup:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout db_backups repo
-        uses: actions/checkout@v3
-        with:
-          repository: gayatriraj123/db_backups
-          path: db_backups
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Checkout dump_scripts repo
-        uses: actions/checkout@v3
-        with:
-          repository: gayatriraj123/dump_scripts
-          path: dump_scripts
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mysql-client openssh-client
 
-      - name: Install dependencies
-        run: |
-          cd dump_scripts
-          pip install -r requirements.txt
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Run Backup Script
-        env:
-          # BOPO
-          BOPO_DB_HOST: ${{ secrets.BOPO_DB_HOST }}
-          BOPO_DB_NAME: ${{ secrets.BOPO_DB_NAME }}
-          BOPO_DB_USER: ${{ secrets.BOPO_DB_USER }}
-          BOPO_DB_PASSWORD: ${{ secrets.BOPO_DB_PASSWORD }}
-          BOPO_DB_PORT: ${{ secrets.BOPO_DB_PORT }}
-          BOPO_SSH_HOST: ${{ secrets.BOPO_SSH_HOST }}
-          BOPO_SSH_USER: ${{ secrets.BOPO_SSH_USER }}
-          BOPO_SSH_PASSWORD: ${{ secrets.BOPO_SSH_PASSWORD }}
-          BOPO_SSH_PORT: ${{ secrets.BOPO_SSH_PORT }}
+    - name: Create SSH keys and environment
+      run: |
+        # Create .env file from secrets
+        echo "EXT_SSH_KEY_PATH=EXG_Linux_key_pair.pem" >> .env
+        echo "EXT_SSH_USER=${{ secrets.EXT_SSH_USER }}" >> .env
+        echo "EXT_SSH_HOST=${{ secrets.EXT_SSH_HOST }}" >> .env
+        echo "EXT_DB_NAME=${{ secrets.EXT_DB_NAME }}" >> .env
+        echo "EXT_DB_USER=${{ secrets.EXT_DB_USER }}" >> .env
+        echo "EXT_DB_PASSWORD=${{ secrets.EXT_DB_PASSWORD }}" >> .env
+        echo "EXT_DB_HOST=${{ secrets.EXT_DB_HOST }}" >> .env
+        echo "EXT_DB_PORT=${{ secrets.EXT_DB_PORT }}" >> .env
+        
+        echo "EXT_PRO_SSH_KEY_PATH=EXG_Linux_key_pair.pem" >> .env
+        echo "EXT_PRO_SSH_USER=${{ secrets.EXT_PRO_SSH_USER }}" >> .env
+        echo "EXT_PRO_SSH_HOST=${{ secrets.EXT_PRO_SSH_HOST }}" >> .env
+        echo "EXT_PRO_DB_NAME=${{ secrets.EXT_PRO_DB_NAME }}" >> .env
+        echo "EXT_PRO_DB_USER=${{ secrets.EXT_PRO_DB_USER }}" >> .env
+        echo "EXT_PRO_DB_PASSWORD=${{ secrets.EXT_PRO_DB_PASSWORD }}" >> .env
+        echo "EXT_PRO_DB_HOST=${{ secrets.EXT_PRO_DB_HOST }}" >> .env
+        echo "EXT_PRO_DB_PORT=${{ secrets.EXT_PRO_DB_PORT }}" >> .env
+        
+        echo "BOPO_SSH_HOST=${{ secrets.BOPO_SSH_HOST }}" >> .env
+        echo "BOPO_SSH_PORT=${{ secrets.BOPO_SSH_PORT }}" >> .env
+        echo "BOPO_SSH_USER=${{ secrets.BOPO_SSH_USER }}" >> .env
+        echo "BOPO_SSH_PASSWORD=${{ secrets.BOPO_SSH_PASSWORD }}" >> .env
+        echo "BOPO_DB_NAME=${{ secrets.BOPO_DB_NAME }}" >> .env
+        echo "BOPO_DB_USER=${{ secrets.BOPO_DB_USER }}" >> .env
+        echo "BOPO_DB_PASSWORD=${{ secrets.BOPO_DB_PASSWORD }}" >> .env
+        echo "BOPO_DB_HOST=${{ secrets.BOPO_DB_HOST }}" >> .env
+        echo "BOPO_DB_PORT=${{ secrets.BOPO_DB_PORT }}" >> .env
+        
+        echo "KAVYA_SSH_KEY_PATH=Kavya_django_key.pem" >> .env
+        echo "KAVYA_SSH_USER=${{ secrets.KAVYA_SSH_USER }}" >> .env
+        echo "KAVYA_SSH_HOST=${{ secrets.KAVYA_SSH_HOST }}" >> .env
+        echo "KAVYA_DB_NAME=${{ secrets.KAVYA_DB_NAME }}" >> .env
+        echo "KAVYA_DB_USER=${{ secrets.KAVYA_DB_USER }}" >> .env
+        echo "KAVYA_DB_PASSWORD=${{ secrets.KAVYA_DB_PASSWORD }}" >> .env
+        echo "KAVYA_DB_HOST=${{ secrets.KAVYA_DB_HOST }}" >> .env
+        echo "KAVYA_DB_PORT=${{ secrets.KAVYA_DB_PORT }}" >> .env
+        
+        # Google Drive folder IDs
+        echo "DRIVE_BOPO_FOLDER_ID=${{ secrets.DRIVE_BOPO_FOLDER_ID }}" >> .env
+        echo "DRIVE_EXT_PROD_FOLDER_ID=${{ secrets.DRIVE_EXT_PROD_FOLDER_ID }}" >> .env
+        echo "DRIVE_EXT_TEST_FOLDER_ID=${{ secrets.DRIVE_EXT_TEST_FOLDER_ID }}" >> .env
+        echo "DRIVE_KAVYA_FOLDER_ID=${{ secrets.DRIVE_KAVYA_FOLDER_ID }}" >> .env
+        echo "DRIVE_BOPO_BACKUP_FOLDER_ID_1=${{ secrets.DRIVE_BOPO_BACKUP_FOLDER_ID_1 }}" >> .env
+        echo "DRIVE_EXT_PROD_BACKUP_FOLDER_ID_1=${{ secrets.DRIVE_EXT_PROD_BACKUP_FOLDER_ID_1 }}" >> .env
+        echo "DRIVE_EXT_TEST_BACKUP_FOLDER_ID_1=${{ secrets.DRIVE_EXT_TEST_BACKUP_FOLDER_ID_1 }}" >> .env
+        echo "DRIVE_KAVYA_BACKUP_FOLDER_ID_1=${{ secrets.DRIVE_KAVYA_BACKUP_FOLDER_ID_1 }}" >> .env
+        echo "DRIVE_BOPO_BACKUP_FOLDER_ID_2=${{ secrets.DRIVE_BOPO_BACKUP_FOLDER_ID_2 }}" >> .env
+        echo "DRIVE_EXT_PROD_BACKUP_FOLDER_ID_2=${{ secrets.DRIVE_EXT_PROD_BACKUP_FOLDER_ID_2 }}" >> .env
+        echo "DRIVE_EXT_TEST_BACKUP_FOLDER_ID_2=${{ secrets.DRIVE_EXT_TEST_BACKUP_FOLDER_ID_2 }}" >> .env
+        echo "DRIVE_KAVYA_BACKUP_FOLDER_ID_2=${{ secrets.DRIVE_KAVYA_BACKUP_FOLDER_ID_2 }}" >> .env
 
-          # EXT TEST
-          EXT_DB_HOST: ${{ secrets.EXT_DB_HOST }}
-          EXT_DB_NAME: ${{ secrets.EXT_DB_NAME }}
-          EXT_DB_USER: ${{ secrets.EXT_DB_USER }}
-          EXT_DB_PASSWORD: ${{ secrets.EXT_DB_PASSWORD }}
-          EXT_DB_PORT: ${{ secrets.EXT_DB_PORT }}
-          EXT_SSH_HOST: ${{ secrets.EXT_SSH_HOST }}
-          EXT_SSH_USER: ${{ secrets.EXT_SSH_USER }}
-          EXT_SSH_KEY_PATH: ${{ secrets.EXT_SSH_KEY_PATH }}
+        # Create SSH keys
+        echo "${{ secrets.EXG_LINUX_KEY_PAIR }}" > EXG_Linux_key_pair.pem
+        echo "${{ secrets.KAVYA_DJANGO_KEY }}" > Kavya_django_key.pem
+        
+        # Set proper permissions for SSH keys
+        chmod 600 EXG_Linux_key_pair.pem
+        chmod 600 Kavya_django_key.pem
 
-          # EXT PRODUCTION
-          EXT_PRO_DB_HOST: ${{ secrets.EXT_PRO_DB_HOST }}
-          EXT_PRO_DB_NAME: ${{ secrets.EXT_PRO_DB_NAME }}
-          EXT_PRO_DB_USER: ${{ secrets.EXT_PRO_DB_USER }}
-          EXT_PRO_DB_PASSWORD: ${{ secrets.EXT_PRO_DB_PASSWORD }}
-          EXT_PRO_DB_PORT: ${{ secrets.EXT_PRO_DB_PORT }}
-          EXT_PRO_SSH_HOST: ${{ secrets.EXT_PRO_SSH_HOST }}
-          EXT_PRO_SSH_USER: ${{ secrets.EXT_PRO_SSH_USER }}
-          EXT_PRO_SSH_KEY_PATH: ${{ secrets.EXT_PRO_SSH_KEY_PATH }}
+    - name: Create Google Drive token file
+      run: |
+        echo '${{ secrets.GOOGLE_DRIVE_TOKEN }}' > token.json
 
-          # KAVYA (if needed later)
-          KAVYA_DB_HOST: ${{ secrets.KAVYA_DB_HOST }}
-          KAVYA_DB_NAME: ${{ secrets.KAVYA_DB_NAME }}
-          KAVYA_DB_USER: ${{ secrets.KAVYA_DB_USER }}
-          KAVYA_DB_PASSWORD: ${{ secrets.KAVYA_DB_PASSWORD }}
-          KAVYA_DB_PORT: ${{ secrets.KAVYA_DB_PORT }}
-          KAVYA_SSH_HOST: ${{ secrets.KAVYA_SSH_HOST }}
-          KAVYA_SSH_USER: ${{ secrets.KAVYA_SSH_USER }}
-          KAVYA_SSH_KEY_PATH: ${{ secrets.KAVYA_SSH_KEY_PATH }}
-          KAVYA_DJANGO_KEY: ${{ secrets.KAVYA_DJANGO_KEY }}
+    - name: Run database backup script
+      run: |
+        python scheduled_dump.py
 
-          # Google Drive
-          DRIVE_BOPO_FOLDER_ID: ${{ secrets.DRIVE_BOPO_FOLDER_ID }}
-          DRIVE_EXT_TEST_FOLDER_ID: ${{ secrets.DRIVE_EXT_TEST_FOLDER_ID }}
-          DRIVE_EXT_PROD_FOLDER_ID: ${{ secrets.DRIVE_EXT_PROD_FOLDER_ID }}
-          DRIVE_KAVYA_FOLDER_ID: ${{ secrets.DRIVE_KAVYA_FOLDER_ID }}
-          TOKEN: ${{ secrets.TOKEN }}
-        run: |
-          cd dump_scripts
-          python scheduled_dumps.py --output ../db_backups
-
-      - name: Clean up old dumps (keep latest 10 per folder)
-        run: |
-          for dir in db_backups/BOPO_test db_backups/EXT_test db_backups/EXT_production; do
-            ls -t $dir/*.sql | tail -n +11 | xargs -r rm --
-          done
-
-      - name: Commit and Push Dumps
-        run: |
-          cd db_backups
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
-          git add .
-          git commit -m "Automated DB Backup $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          git push origin main
+    - name: Clean up sensitive files
+      run: |
+        rm -f .env
+        rm -f EXG_Linux_key_pair.pem
+        rm -f Kavya_django_key.pem
+        rm -f token.json
