@@ -1,67 +1,102 @@
-name: Scheduled DB Dumps
+name: Database Backup
 
 on:
+  workflow_dispatch:  # manual trigger
   schedule:
-    - cron: "0 */6 * * *"   # every 6 hours (adjust as needed)
-  workflow_dispatch:         # allow manual trigger
+    - cron: "30 20 * * *"   # runs daily at 2:00 AM IST (20:30 UTC)
 
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout db_backups repo
+        uses: actions/checkout@v3
+        with:
+          repository: gayatriraj123/db_backups
+          path: db_backups
+
       - name: Checkout dump_scripts repo
         uses: actions/checkout@v3
         with:
           repository: gayatriraj123/dump_scripts
           path: dump_scripts
 
-      - name: Checkout db_backups repo
-        uses: actions/checkout@v3
-        with:
-          repository: gayatriraj123/db_backups
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: db_backups
-
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           cd dump_scripts
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Setup .env file from secret
-        run: |
-          echo "${{ secrets.ENV_FILE }}" | base64 --decode > dump_scripts/.env
+      - name: Run Backup Script
+        env:
+          # BOPO
+          BOPO_DB_HOST: ${{ secrets.BOPO_DB_HOST }}
+          BOPO_DB_NAME: ${{ secrets.BOPO_DB_NAME }}
+          BOPO_DB_USER: ${{ secrets.BOPO_DB_USER }}
+          BOPO_DB_PASSWORD: ${{ secrets.BOPO_DB_PASSWORD }}
+          BOPO_DB_PORT: ${{ secrets.BOPO_DB_PORT }}
+          BOPO_SSH_HOST: ${{ secrets.BOPO_SSH_HOST }}
+          BOPO_SSH_USER: ${{ secrets.BOPO_SSH_USER }}
+          BOPO_SSH_PASSWORD: ${{ secrets.BOPO_SSH_PASSWORD }}
+          BOPO_SSH_PORT: ${{ secrets.BOPO_SSH_PORT }}
 
-      - name: Run scheduled dump script
+          # EXT TEST
+          EXT_DB_HOST: ${{ secrets.EXT_DB_HOST }}
+          EXT_DB_NAME: ${{ secrets.EXT_DB_NAME }}
+          EXT_DB_USER: ${{ secrets.EXT_DB_USER }}
+          EXT_DB_PASSWORD: ${{ secrets.EXT_DB_PASSWORD }}
+          EXT_DB_PORT: ${{ secrets.EXT_DB_PORT }}
+          EXT_SSH_HOST: ${{ secrets.EXT_SSH_HOST }}
+          EXT_SSH_USER: ${{ secrets.EXT_SSH_USER }}
+          EXT_SSH_KEY_PATH: ${{ secrets.EXT_SSH_KEY_PATH }}
+
+          # EXT PRODUCTION
+          EXT_PRO_DB_HOST: ${{ secrets.EXT_PRO_DB_HOST }}
+          EXT_PRO_DB_NAME: ${{ secrets.EXT_PRO_DB_NAME }}
+          EXT_PRO_DB_USER: ${{ secrets.EXT_PRO_DB_USER }}
+          EXT_PRO_DB_PASSWORD: ${{ secrets.EXT_PRO_DB_PASSWORD }}
+          EXT_PRO_DB_PORT: ${{ secrets.EXT_PRO_DB_PORT }}
+          EXT_PRO_SSH_HOST: ${{ secrets.EXT_PRO_SSH_HOST }}
+          EXT_PRO_SSH_USER: ${{ secrets.EXT_PRO_SSH_USER }}
+          EXT_PRO_SSH_KEY_PATH: ${{ secrets.EXT_PRO_SSH_KEY_PATH }}
+
+          # KAVYA (if needed later)
+          KAVYA_DB_HOST: ${{ secrets.KAVYA_DB_HOST }}
+          KAVYA_DB_NAME: ${{ secrets.KAVYA_DB_NAME }}
+          KAVYA_DB_USER: ${{ secrets.KAVYA_DB_USER }}
+          KAVYA_DB_PASSWORD: ${{ secrets.KAVYA_DB_PASSWORD }}
+          KAVYA_DB_PORT: ${{ secrets.KAVYA_DB_PORT }}
+          KAVYA_SSH_HOST: ${{ secrets.KAVYA_SSH_HOST }}
+          KAVYA_SSH_USER: ${{ secrets.KAVYA_SSH_USER }}
+          KAVYA_SSH_KEY_PATH: ${{ secrets.KAVYA_SSH_KEY_PATH }}
+          KAVYA_DJANGO_KEY: ${{ secrets.KAVYA_DJANGO_KEY }}
+
+          # Google Drive
+          DRIVE_BOPO_FOLDER_ID: ${{ secrets.DRIVE_BOPO_FOLDER_ID }}
+          DRIVE_EXT_TEST_FOLDER_ID: ${{ secrets.DRIVE_EXT_TEST_FOLDER_ID }}
+          DRIVE_EXT_PROD_FOLDER_ID: ${{ secrets.DRIVE_EXT_PROD_FOLDER_ID }}
+          DRIVE_KAVYA_FOLDER_ID: ${{ secrets.DRIVE_KAVYA_FOLDER_ID }}
+          TOKEN: ${{ secrets.TOKEN }}
         run: |
           cd dump_scripts
-          python scheduled_dumps.py
+          python scheduled_dumps.py --output ../db_backups
 
-      - name: Copy new dumps into db_backups repo
+      - name: Clean up old dumps (keep latest 10 per folder)
         run: |
-          cp -r dump_scripts/BOPO_test/*.sql db_backups/BOPO_test/ || true
-          cp -r dump_scripts/EXT_test/*.sql db_backups/EXT_test/ || true
-          cp -r dump_scripts/EXT_production/*.sql db_backups/EXT_production/ || true
-
-      - name: Keep only 10 most recent files per folder
-        run: |
-          for folder in BOPO_test EXT_test EXT_production; do
-            cd db_backups/$folder
-            ls -tp | grep -v '/$' | tail -n +11 | xargs -I {} rm -- {}
-            cd ../..
+          for dir in db_backups/BOPO_test db_backups/EXT_test db_backups/EXT_production; do
+            ls -t $dir/*.sql | tail -n +11 | xargs -r rm --
           done
 
-      - name: Commit and push backups
+      - name: Commit and Push Dumps
         run: |
           cd db_backups
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
           git add .
-          git commit -m "Update DB backups on $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git commit -m "Automated DB Backup $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
           git push origin main
