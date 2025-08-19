@@ -29,5 +29,7 @@ jobs:
     - name: Restore token.json
       run: echo '${{ secrets.TOKEN_JSON }}' > token.json
       
-    - name: Run dump script
-      run: python scheduled_dumps.py
+    - name: Run dump script with debug
+      run: |
+        python -u scheduled_dumps.py
+
