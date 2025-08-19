@@ -98,13 +98,52 @@ jobs:
       run: |
         echo '${{ secrets.GOOGLE_DRIVE_TOKEN }}' > token.json
 
+    - name: Debug before running
+      run: |
+        echo "=== Checking environment ==="
+        ls -la
+        echo "=== .env file content ==="
+        cat .env
+        echo "=== Python packages ==="
+        pip list
+
     - name: Run database backup script
       run: |
-        # List files to debug directory structure
-        ls -la
-        echo "Current directory: $(pwd)"
-        # Run the script
+        echo "=== Running backup script ==="
         python scheduled_dumps.py
+
+    - name: Check results after running
+      run: |
+        echo "=== Checking if dump files were created ==="
+        find . -name "*.sql" -type f
+        echo "=== Checking dump folders ==="
+        ls -la BOPO_test/ EXT_test/ EXT_production/ KAVYA_test/ 2>/dev/null || echo "Some folders not found"
+        echo "=== Checking db_backups repo ==="
+        if [ -d "db_backups" ]; then
+            find db_backups -name "*.sql" -type f
+        else
+            echo "db_backups directory not found!"
+        fi
+
+    - name: Test Google Drive connection
+      run: |
+        echo "=== Testing Google Drive connection ==="
+        python -c "
+        from pydrive2.auth import GoogleAuth
+        gauth = GoogleAuth()
+        gauth.LoadCredentialsFile('token.json')
+        if gauth.credentials:
+            print('Google Drive: SUCCESS - Credentials loaded')
+            from pydrive2.drive import GoogleDrive
+            drive = GoogleDrive(gauth)
+            try:
+                file_list = drive.ListFile({'q': \"trashed=false\"}).GetList()
+                print(f'Google Drive: SUCCESS - Found {len(file_list)} files')
+            except Exception as e:
+                print(f'Google Drive ERROR: {e}')
+        else:
+            print('Google Drive: FAILED - No credentials found')
+        "
 
     - name: Clean up sensitive files
       run: |
