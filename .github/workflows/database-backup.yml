@@ -131,7 +131,7 @@ jobs:
                 git config user.email "github-actions@github.com"
                 git config user.name "GitHub Actions"
                 git commit -m "Auto backup at $(date '+%Y-%m-%d %H:%M:%S')"
-                git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/gayatriraj123/db_backups.git main
+                git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/gayatriraj/db_backups.git main
                 echo "✅ Successfully pushed to GitHub"
             else
                 echo "No changes to commit"
