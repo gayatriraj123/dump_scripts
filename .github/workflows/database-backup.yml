@@ -106,11 +106,11 @@ jobs:
       run: |
         if [ ! -d "db_backups" ]; then
             echo "Cloning db_backups repository..."
-            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/gayatriraj123/db_backups.git db_backups
+            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/gayatriraj123/db_backups.git db_backups
         else
             echo "db_backups repository already exists, pulling latest changes..."
             cd db_backups
-            git pull origin main
+            git pull https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/gayatriraj123/db_backups.git main
             cd ..
         fi
 
@@ -129,7 +129,7 @@ jobs:
                 echo "Changes detected, committing and pushing..."
                 git add .
                 git commit -m "Auto backup at $(date '+%Y-%m-%d %H:%M:%S')"
-                git push origin main
+                git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/gayatriraj123/db_backups.git main
                 echo "✅ Successfully pushed to GitHub"
             else
                 echo "No changes to commit"
