@@ -211,7 +211,7 @@ def run_all_dumps():
     process_dump("ext_test", "download_EXT_dump.py")
     process_dump("ext_prod", "download_ext_production_dump.py")
     process_dump("kavya", "download_kavya_dump.py")
-    push_to_backup_repo()
+    # push_to_backup_repo()     ---------- this is handled in workflow thats why its commented
     logging.info("=== All dumps completed ===\n")
     
 
