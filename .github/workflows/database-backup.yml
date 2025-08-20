@@ -2,7 +2,7 @@ name: Database Backup Scheduler
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 2:00 AM UTC daily
+    - cron: '30 20 * * *'  # 2:00 AM UTC daily
   workflow_dispatch:
 
 jobs:
